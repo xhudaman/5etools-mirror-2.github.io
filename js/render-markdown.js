@@ -558,8 +558,15 @@ class RendererMarkdown {
 	// region images
 	_renderImage (entry, textStack, meta, options) {
 		this._renderPrefix(entry, textStack, meta, options);
-		const href = this._renderImage_getUrl(entry);
-		textStack[0] += `![${entry.title || ""}](${href})`;
+
+		if (entry.data?.base64) {
+			console.log("base64 present", entry.data.base64)
+			textStack[0] += `![${entry.title || ""}](${entry.data.base64})`;
+		} else {
+			const href = this._renderImage_getUrl(entry);
+			textStack[0] += `![${entry.title || ""}](${href})`;
+		}
+
 		this._renderSuffix(entry, textStack, meta, options);
 	}
 

@@ -368,14 +368,16 @@ class BookUtil {
 		hdlNarrowUpdate();
 
 		if (!this._TOP_MENU) {
-			const doDownloadFullText = () => {
-				DataUtil.userDownloadText(
-					`${this.curRender.fromIndex.name}.md`,
-					this.curRender.data
-						.map(chapter => RendererMarkdown.get().render(chapter))
-						.join("\n\n------\n\n"),
-				);
-			};
+			const doDownloadFullText = async () => {
+        await this.walkForImages(this.curRender.data);
+    
+        DataUtil.userDownloadText(
+            `${this.curRender.fromIndex.name}.md`,
+            this.curRender.data
+                .map(chapter => RendererMarkdown.get().render(chapter))
+                .join("\n\n------\n\n"),
+        );
+    	};
 
 			this._TOP_MENU = ContextUtil.getMenu([
 				new ContextUtil.Action(
@@ -928,6 +930,97 @@ class BookUtil {
 	}
 
 	static _getHrefShowAll (bookId) { return `#${UrlUtil.encodeForHash(bookId)},-1`; }
+
+	static async walkForImages (input) {
+		try {
+			if (Array.isArray(input)) {
+				for (let entry of input) {
+					if (!entry) continue;
+
+					if (Array.isArray(entry)) {
+						await this.walkForImages(entry);
+					}
+
+					if (entry.type === "section" || entry.type === "entries") {
+						await this.walkForImages(entry.entries);
+					}
+
+					if (entry.type === "image") {
+						const response = await fetch(Renderer.utils.getEntryMediaUrl(entry, "href", "img"));
+						if (!response) {
+							console.log("No response");
+							continue;
+						};
+
+						const imgBlob = await response.blob();
+						if (!imgBlob) {
+							console.log("No blob");
+							continue;
+						};
+						
+						(entry.data ||= {}).base64 = await this._getImageDataURL(imgBlob);
+					}
+				}
+			} 
+				// else {
+				// console.log(input.type)
+				// if (input.type === "section" || input.type === "entries") {
+				// 	this.walkForImages2(input.entries);
+				// }
+
+				// if (input.type === "image") {
+				// 	const response = await fetch(Renderer.utils.getEntryMediaUrl(input, "href", "img"));
+				// 	if (!response) {console.log("no response"); return};
+
+				// 	const imgBlob = await response.blob();
+				// 	if (!imgBlob) {console.log("no blob"); return};
+					
+				// 	(input.data ||= {}).base64 = await this._getImageDataURL(imgBlob);
+				// }
+			// }
+		} catch (error) { 
+			console.error(error);
+		}
+	}
+
+	static _getImageDataURL (imageBlob) {
+		const fileReader = new FileReader();
+
+		return new Promise((resolve, reject) => {
+			fileReader.onloadend = () => {
+				console.log("resolving")
+				resolve(fileReader.result);
+			};
+
+			fileReader.onerror = () => {
+				fileReader.abort();
+				reject(new Error("Problem reading image."));
+			};
+			
+			fileReader.readAsDataURL(imageBlob);
+		});
+	}
+
+  // static walkForImages (entry, previousValues) {
+  //   console.log({type: entry.type, entry, previousValues});
+
+  //   if (Array.isArray(entry)) return [
+  //     ...previousValues,
+  //     ...entry.flatMap(item => this.walkForImages(item, previousValues))
+  //   ];
+
+  //   if (entry.type === "section" || entry.type === "entries") return [
+  //     ...previousValues,
+  //     ...this.walkForImages(entry.entries, previousValues)
+  //   ];
+
+  //   if (entry.type === "image") return [
+  //     ...previousValues,
+  //     entry
+  //   ];
+
+  //   return previousValues;
+  // }
 }
 // region Last render/etc
 BookUtil.curRender = {

@@ -379,18 +379,24 @@ class BookUtil {
         );
     	};
 
+			const doDownloadChapterText = async () => {
+				await this.walkForImages(this.curRender.data[this.curRender.chapter]);
+
+				const contentsInfo = this.curRender.fromIndex.contents[this.curRender.chapter];
+				DataUtil.userDownloadText(
+					`${this.curRender.fromIndex.name} - ${Parser.bookOrdinalToAbv(contentsInfo.ordinal).replace(/:/g, "")}${contentsInfo.name}.md`,
+					RendererMarkdown.get().render(this.curRender.data[this.curRender.chapter]),
+				);
+			};
+
 			this._TOP_MENU = ContextUtil.getMenu([
 				new ContextUtil.Action(
 					"Download Chapter as Markdown",
 					() => {
 						if (!~BookUtil.curRender.chapter) return doDownloadFullText();
-
-						const contentsInfo = this.curRender.fromIndex.contents[this.curRender.chapter];
-						DataUtil.userDownloadText(
-							`${this.curRender.fromIndex.name} - ${Parser.bookOrdinalToAbv(contentsInfo.ordinal).replace(/:/g, "")}${contentsInfo.name}.md`,
-							RendererMarkdown.get().render(this.curRender.data[this.curRender.chapter]),
-						);
-					},
+						
+						doDownloadChapterText();
+					}
 				),
 				new ContextUtil.Action(
 					`Download ${this.typeTitle} as Markdown`,
@@ -961,23 +967,22 @@ class BookUtil {
 						(entry.data ||= {}).base64 = await this._getImageDataURL(imgBlob);
 					}
 				}
-			} 
-				// else {
-				// console.log(input.type)
-				// if (input.type === "section" || input.type === "entries") {
-				// 	this.walkForImages2(input.entries);
-				// }
+			} else {
+				console.log(input.type)
+				if (input.entries) {
+					await this.walkForImages(input.entries);
+				}
 
-				// if (input.type === "image") {
-				// 	const response = await fetch(Renderer.utils.getEntryMediaUrl(input, "href", "img"));
-				// 	if (!response) {console.log("no response"); return};
+				if (input.type === "image") {
+					const response = await fetch(Renderer.utils.getEntryMediaUrl(input, "href", "img"));
+					if (!response) {console.log("no response"); return};
 
-				// 	const imgBlob = await response.blob();
-				// 	if (!imgBlob) {console.log("no blob"); return};
+					const imgBlob = await response.blob();
+					if (!imgBlob) {console.log("no blob"); return};
 					
-				// 	(input.data ||= {}).base64 = await this._getImageDataURL(imgBlob);
-				// }
-			// }
+					(input.data ||= {}).base64 = await this._getImageDataURL(imgBlob);
+				}
+			}
 		} catch (error) { 
 			console.error(error);
 		}

@@ -947,38 +947,31 @@ class BookUtil {
 						await this.walkForImages(entry);
 					}
 
-					if (entry.type === "section" || entry.type === "entries") {
+					if (entry.entries) {
 						await this.walkForImages(entry.entries);
 					}
 
 					if (entry.type === "image") {
 						const response = await fetch(Renderer.utils.getEntryMediaUrl(entry, "href", "img"));
-						if (!response) {
-							console.log("No response");
-							continue;
-						};
+						if (!response) continue;
 
 						const imgBlob = await response.blob();
-						if (!imgBlob) {
-							console.log("No blob");
-							continue;
-						};
+						if (!imgBlob) continue;
 						
 						(entry.data ||= {}).base64 = await this._getImageDataURL(imgBlob);
 					}
 				}
 			} else {
-				console.log(input.type)
 				if (input.entries) {
 					await this.walkForImages(input.entries);
 				}
 
 				if (input.type === "image") {
 					const response = await fetch(Renderer.utils.getEntryMediaUrl(input, "href", "img"));
-					if (!response) {console.log("no response"); return};
+					if (!response) return;
 
 					const imgBlob = await response.blob();
-					if (!imgBlob) {console.log("no blob"); return};
+					if (!imgBlob) return;
 					
 					(input.data ||= {}).base64 = await this._getImageDataURL(imgBlob);
 				}
@@ -1005,27 +998,6 @@ class BookUtil {
 			fileReader.readAsDataURL(imageBlob);
 		});
 	}
-
-  // static walkForImages (entry, previousValues) {
-  //   console.log({type: entry.type, entry, previousValues});
-
-  //   if (Array.isArray(entry)) return [
-  //     ...previousValues,
-  //     ...entry.flatMap(item => this.walkForImages(item, previousValues))
-  //   ];
-
-  //   if (entry.type === "section" || entry.type === "entries") return [
-  //     ...previousValues,
-  //     ...this.walkForImages(entry.entries, previousValues)
-  //   ];
-
-  //   if (entry.type === "image") return [
-  //     ...previousValues,
-  //     entry
-  //   ];
-
-  //   return previousValues;
-  // }
 }
 // region Last render/etc
 BookUtil.curRender = {

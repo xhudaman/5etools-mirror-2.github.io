@@ -952,13 +952,8 @@ class BookUtil {
 					}
 
 					if (entry.type === "image" && !entry.data?.base64) {
-						const response = await fetch(Renderer.utils.getEntryMediaUrl(entry, "href", "img"));
-						if (!response) continue;
-
-						const imgBlob = await response.blob();
-						if (!imgBlob) continue;
-						
-						(entry.data ||= {}).base64 = await this._getImageDataURL(imgBlob);
+						const imageUrl = Renderer.utils.getEntryMediaUrl(entry, "href", "img");
+						(entry.data ||= {}).base64 = await this._getImageDataURL(imageUrl);
 					}
 				}
 			} else {
@@ -967,34 +962,37 @@ class BookUtil {
 				}
 
 				if (input.type === "image" && !input.data?.base64) {
-					const response = await fetch(Renderer.utils.getEntryMediaUrl(input, "href", "img"));
-					if (!response) return;
-
-					const imgBlob = await response.blob();
-					if (!imgBlob) return;
-					
-					(input.data ||= {}).base64 = await this._getImageDataURL(imgBlob);
+					const imageUrl = Renderer.utils.getEntryMediaUrl(entry, "href", "img");
+					(entry.data ||= {}).base64 = await this._getImageDataURL(imageUrl);
 				}
 			}
 		} catch (error) { 
-			console.error(error);
+			JqueryUtil.doToast({
+				type: "warning",
+				content: error.message ?? error
+			});
 		}
 	}
 
-	static _getImageDataURL (imageBlob) {
+	static async _getImageDataURL (imageUrl) {
+		const response = await fetch(imageUrl);
+		if (!response) throw new Error(`Couldn't fetch image ${imageUrl}`);
+
+		const imgBlob = await response.blob();
+		if (!imgBlob) throw new Error(`Couldn't process image ${imageUrl}`);
+
 		const fileReader = new FileReader();
 
 		return new Promise((resolve, reject) => {
 			fileReader.onloadend = () => {
-				console.log("resolving")
 				resolve(fileReader.result);
 			};
 
 			fileReader.onerror = () => {
 				fileReader.abort();
-				reject(new Error("Problem reading image."));
+				reject(new Error(`Couldn't process image ${imageUrl}`));
 			};
-			
+
 			fileReader.readAsDataURL(imageBlob);
 		});
 	}

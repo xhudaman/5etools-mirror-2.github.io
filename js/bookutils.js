@@ -369,15 +369,15 @@ class BookUtil {
 
 		if (!this._TOP_MENU) {
 			const doDownloadFullText = async () => {
-        await this.walkForImages(this.curRender.data);
-    
-        DataUtil.userDownloadText(
-            `${this.curRender.fromIndex.name}.md`,
-            this.curRender.data
-                .map(chapter => RendererMarkdown.get().render(chapter))
-                .join("\n\n------\n\n"),
-        );
-    	};
+				await this.walkForImages(this.curRender.data);
+
+				DataUtil.userDownloadText(
+					`${this.curRender.fromIndex.name}.md`,
+					this.curRender.data
+						.map(chapter => RendererMarkdown.get().render(chapter))
+						.join("\n\n------\n\n"),
+				);
+			};
 
 			const doDownloadChapterText = async () => {
 				await this.walkForImages(this.curRender.data[this.curRender.chapter]);
@@ -394,9 +394,9 @@ class BookUtil {
 					"Download Chapter as Markdown",
 					() => {
 						if (!~BookUtil.curRender.chapter) return doDownloadFullText();
-						
+
 						doDownloadChapterText();
-					}
+					},
 				),
 				new ContextUtil.Action(
 					`Download ${this.typeTitle} as Markdown`,
@@ -966,10 +966,10 @@ class BookUtil {
 					(entry.data ||= {}).base64 = await this._getImageDataURL(imageUrl);
 				}
 			}
-		} catch (error) { 
+		} catch (error) {
 			JqueryUtil.doToast({
 				type: "warning",
-				content: error.message ?? error
+				content: error.message ?? error,
 			});
 		}
 	}

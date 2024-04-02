@@ -951,7 +951,7 @@ class BookUtil {
 						await this.walkForImages(entry.entries);
 					}
 
-					if (entry.type === "image") {
+					if (entry.type === "image" && !entry.data?.base64) {
 						const response = await fetch(Renderer.utils.getEntryMediaUrl(entry, "href", "img"));
 						if (!response) continue;
 
@@ -966,7 +966,7 @@ class BookUtil {
 					await this.walkForImages(input.entries);
 				}
 
-				if (input.type === "image") {
+				if (input.type === "image" && !input.data?.base64) {
 					const response = await fetch(Renderer.utils.getEntryMediaUrl(input, "href", "img"));
 					if (!response) return;
 

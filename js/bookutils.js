@@ -978,8 +978,8 @@ class BookUtil {
 		const response = await fetch(imageUrl);
 		if (!response) throw new Error(`Couldn't fetch image ${imageUrl}`);
 
-		const imgBlob = await response.blob();
-		if (!imgBlob) throw new Error(`Couldn't process image ${imageUrl}`);
+		const imageBlob = await response.blob();
+		if (!imageBlob) throw new Error(`Couldn't process image ${imageUrl}`);
 
 		const fileReader = new FileReader();
 

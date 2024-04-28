@@ -369,8 +369,6 @@ class BookUtil {
 
 		if (!this._TOP_MENU) {
 			const doDownloadFullText = async () => {
-				await this.walkForImages(this.curRender.data);
-
 				DataUtil.userDownloadText(
 					`${this.curRender.fromIndex.name}.md`,
 					this.curRender.data
@@ -379,14 +377,22 @@ class BookUtil {
 				);
 			};
 
-			const doDownloadChapterText = async () => {
-				await this.walkForImages(this.curRender.data[this.curRender.chapter]);
+			const doDownloadFullTextWithImages = async () => {
+				await this._walkForImages(this.curRender.data);
+				doDownloadFullText();
+			};
 
+			const doDownloadChapterText = async () => {
 				const contentsInfo = this.curRender.fromIndex.contents[this.curRender.chapter];
 				DataUtil.userDownloadText(
 					`${this.curRender.fromIndex.name} - ${Parser.bookOrdinalToAbv(contentsInfo.ordinal).replace(/:/g, "")}${contentsInfo.name}.md`,
 					RendererMarkdown.get().render(this.curRender.data[this.curRender.chapter]),
 				);
+			};
+
+			const doDownloadChapterTextWithImages = async () => {
+				await this._walkForImages(this.curRender.data[this.curRender.chapter]);
+				doDownloadChapterText();
 			};
 
 			this._TOP_MENU = ContextUtil.getMenu([
@@ -402,6 +408,21 @@ class BookUtil {
 					`Download ${this.typeTitle} as Markdown`,
 					() => {
 						doDownloadFullText();
+					},
+				),
+				null,
+				new ContextUtil.Action(
+					"Download Chapter as Markdown (With Images)",
+					() => {
+						if (!~BookUtil.curRender.chapter) return doDownloadFullText();
+
+						doDownloadChapterTextWithImages();
+					},
+				),
+				new ContextUtil.Action(
+					`Download ${this.typeTitle} as Markdown  (With Images)`,
+					() => {
+						doDownloadFullTextWithImages();
 					},
 				),
 			]);
@@ -937,64 +958,62 @@ class BookUtil {
 
 	static _getHrefShowAll (bookId) { return `#${UrlUtil.encodeForHash(bookId)},-1`; }
 
-	static async walkForImages (input) {
-		try {
-			if (Array.isArray(input)) {
-				for (let entry of input) {
-					if (!entry) continue;
+	static async _walkForImages (input) {
+		const failedUrls = [];
 
-					if (Array.isArray(entry)) {
-						await this.walkForImages(entry);
-					}
+		await MiscUtil.getAsyncWalker({ keyBlocklist: MiscUtil.GENERIC_WALKER_ENTRIES_KEY_BLOCKLIST, isNoModification: true }).pWalk(input, {
+			object: async (entry) => {
+				if (entry.type !== "image" || entry.data?.base64) return;
 
-					if (entry.entries) {
-						await this.walkForImages(entry.entries);
-					}
+				const imageUrl = Renderer.utils.getEntryMediaUrl(entry, "href", "img");
+				const dataURL = await this._getImageDataURL(imageUrl).catch(() => {
+					failedUrls.push(imageUrl);
+					return undefined;
+				});
 
-					if (entry.type === "image" && !entry.data?.base64) {
-						const imageUrl = Renderer.utils.getEntryMediaUrl(entry, "href", "img");
-						(entry.data ||= {}).base64 = await this._getImageDataURL(imageUrl);
-					}
-				}
-			} else {
-				if (input.entries) {
-					await this.walkForImages(input.entries);
-				}
+				if (!dataURL) return;
 
-				if (input.type === "image" && !input.data?.base64) {
-					const imageUrl = Renderer.utils.getEntryMediaUrl(entry, "href", "img");
-					(entry.data ||= {}).base64 = await this._getImageDataURL(imageUrl);
-				}
-			}
-		} catch (error) {
+				(entry.data ||= {}).base64 = dataURL;
+			},
+		});
+
+		if (failedUrls.length) {
+			const content = $("<div></div>").html("<span>Failed to load images:</span><br><ul></ul>");
+
+			$.each(failedUrls, (_, value) => {
+				content.find("ul").append($(`<li>${value}</li>`));
+			});
+
 			JqueryUtil.doToast({
 				type: "warning",
-				content: error.message ?? error,
+				content,
 			});
 		}
 	}
 
 	static async _getImageDataURL (imageUrl) {
-		const response = await fetch(imageUrl);
-		if (!response) throw new Error(`Couldn't fetch image ${imageUrl}`);
+		try {
+			const response = await fetch(imageUrl);
+			const imageBlob = await response.blob();
 
-		const imageBlob = await response.blob();
-		if (!imageBlob) throw new Error(`Couldn't process image ${imageUrl}`);
+			const fileReader = new FileReader();
 
-		const fileReader = new FileReader();
+			return new Promise((resolve, reject) => {
+				fileReader.onloadend = () => {
+					resolve(fileReader.result);
+				};
 
-		return new Promise((resolve, reject) => {
-			fileReader.onloadend = () => {
-				resolve(fileReader.result);
-			};
+				fileReader.onerror = () => {
+					fileReader.abort();
+					reject(new Error(`Couldn't load image ${imageUrl}`));
+				};
 
-			fileReader.onerror = () => {
-				fileReader.abort();
-				reject(new Error(`Couldn't process image ${imageUrl}`));
-			};
-
-			fileReader.readAsDataURL(imageBlob);
-		});
+				fileReader.readAsDataURL(imageBlob);
+			});
+		} catch (error) {
+			setTimeout(() => { throw error });
+			throw new Error(`Couldn't load image ${imageUrl}`);
+		}
 	}
 }
 // region Last render/etc

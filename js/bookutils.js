@@ -368,7 +368,7 @@ class BookUtil {
 		hdlNarrowUpdate();
 
 		if (!this._TOP_MENU) {
-			const doDownloadFullText = () => {
+			const doDownloadFullText = async () => {
 				DataUtil.userDownloadText(
 					`${this.curRender.fromIndex.name}.md`,
 					this.curRender.data
@@ -377,23 +377,52 @@ class BookUtil {
 				);
 			};
 
+			const doDownloadFullTextWithImages = async () => {
+				await this._walkForImages(this.curRender.data);
+				doDownloadFullText();
+			};
+
+			const doDownloadChapterText = async () => {
+				const contentsInfo = this.curRender.fromIndex.contents[this.curRender.chapter];
+				DataUtil.userDownloadText(
+					`${this.curRender.fromIndex.name} - ${Parser.bookOrdinalToAbv(contentsInfo.ordinal).replace(/:/g, "")}${contentsInfo.name}.md`,
+					RendererMarkdown.get().render(this.curRender.data[this.curRender.chapter]),
+				);
+			};
+
+			const doDownloadChapterTextWithImages = async () => {
+				await this._walkForImages(this.curRender.data[this.curRender.chapter]);
+				doDownloadChapterText();
+			};
+
 			this._TOP_MENU = ContextUtil.getMenu([
 				new ContextUtil.Action(
 					"Download Chapter as Markdown",
 					() => {
 						if (!~BookUtil.curRender.chapter) return doDownloadFullText();
 
-						const contentsInfo = this.curRender.fromIndex.contents[this.curRender.chapter];
-						DataUtil.userDownloadText(
-							`${this.curRender.fromIndex.name} - ${Parser.bookOrdinalToAbv(contentsInfo.ordinal).replace(/:/g, "")}${contentsInfo.name}.md`,
-							RendererMarkdown.get().render(this.curRender.data[this.curRender.chapter]),
-						);
+						doDownloadChapterText();
 					},
 				),
 				new ContextUtil.Action(
 					`Download ${this.typeTitle} as Markdown`,
 					() => {
 						doDownloadFullText();
+					},
+				),
+				null,
+				new ContextUtil.Action(
+					"Download Chapter as Markdown (With Images)",
+					() => {
+						if (!~BookUtil.curRender.chapter) return doDownloadFullText();
+
+						doDownloadChapterTextWithImages();
+					},
+				),
+				new ContextUtil.Action(
+					`Download ${this.typeTitle} as Markdown  (With Images)`,
+					() => {
+						doDownloadFullTextWithImages();
 					},
 				),
 			]);
@@ -928,6 +957,64 @@ class BookUtil {
 	}
 
 	static _getHrefShowAll (bookId) { return `#${UrlUtil.encodeForHash(bookId)},-1`; }
+
+	static async _walkForImages (input) {
+		const failedUrls = [];
+
+		await MiscUtil.getAsyncWalker({ keyBlocklist: MiscUtil.GENERIC_WALKER_ENTRIES_KEY_BLOCKLIST, isNoModification: true }).pWalk(input, {
+			object: async (entry) => {
+				if (entry.type !== "image" || entry.data?.base64) return;
+
+				const imageUrl = Renderer.utils.getEntryMediaUrl(entry, "href", "img");
+				const dataURL = await this._getImageDataURL(imageUrl).catch(() => {
+					failedUrls.push(imageUrl);
+					return undefined;
+				});
+
+				if (!dataURL) return;
+
+				(entry.data ||= {}).base64 = dataURL;
+			},
+		});
+
+		if (failedUrls.length) {
+			const content = $("<div></div>").html("<span>Failed to load images:</span><br><ul></ul>");
+
+			$.each(failedUrls, (_, value) => {
+				content.find("ul").append($(`<li>${value}</li>`));
+			});
+
+			JqueryUtil.doToast({
+				type: "warning",
+				content,
+			});
+		}
+	}
+
+	static async _getImageDataURL (imageUrl) {
+		try {
+			const response = await fetch(imageUrl);
+			const imageBlob = await response.blob();
+
+			const fileReader = new FileReader();
+
+			return new Promise((resolve, reject) => {
+				fileReader.onloadend = () => {
+					resolve(fileReader.result);
+				};
+
+				fileReader.onerror = () => {
+					fileReader.abort();
+					reject(new Error(`Couldn't load image ${imageUrl}`));
+				};
+
+				fileReader.readAsDataURL(imageBlob);
+			});
+		} catch (error) {
+			setTimeout(() => { throw error });
+			throw new Error(`Couldn't load image ${imageUrl}`);
+		}
+	}
 }
 // region Last render/etc
 BookUtil.curRender = {

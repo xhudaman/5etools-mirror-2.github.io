@@ -902,7 +902,7 @@ globalThis.JqueryUtil = {
 	_WRP_TOAST: null,
 	_ACTIVE_TOAST: [],
 	/**
-	 * @param {{content: jQuery|string, type?: string, autoHideTime?: boolean} | string} options The options for the toast.
+	 * @param {{content: jQuery|string, type?: string, autoHideTime?: number, isAutoHide?: boolean} | string} options The options for the toast.
 	 * @param {(jQuery|string)} options.content Toast contents. Supports jQuery objects.
 	 * @param {string} options.type Toast type. Can be any Bootstrap alert type ("success", "info", "warning", or "danger").
 	 * @param {number} options.autoHideTime The time in ms before the toast will be automatically hidden.
